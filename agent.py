@@ -225,6 +225,67 @@ def lineup_report(sim, ranked, current, players, now, slots):
     return "\n".join(out)
 
 
+def phone_report(sim, ranked, current, m, now):
+    """The whole week on one Discord card: odds, lineup with reasons, FLEX, close calls,
+    changes, news and the opponent's threats. First line = the phone notification."""
+    best_win, best = ranked[0]
+    cur_win = next((w for w, lu in ranked if ids(lu) == ids(current)), best_win)
+    odds = sim.win_prob(flat(best))
+    underdog = best_win < 0.5
+    changes, _ = explain(best, current, best_win, cur_win)
+    keep = not changes or best_win - cur_win < SWITCH_MARGIN
+
+    head = (f"📋 Week {m.week}: {best_win:.0%} to win "
+            f"({'underdog' if underdog else 'favored'}), "
+            + ("keep your lineup" if keep else f"{len(changes)} change(s) recommended"))
+    out = [f"Projected score: **{odds['my_median']:.0f}** vs **{odds['opp_median']:.0f}** "
+           f"(you {odds['my_p10_p90'][0]:.0f}-{odds['my_p10_p90'][1]:.0f} in most games)",
+           f"Strategy: {'play for upside (ceilings)' if underdog else 'play it safe (floors)'}", "",
+           "**Your lineup**  (median, floor-ceiling)"]
+    for slot in _ordered(m.slots):
+        for p in best.get(slot, []):
+            tag = " ⬆ from bench" if p.slot in NON_STARTING else ""
+            doubt = f" · {p.play_prob:.0%} to play" if p.play_prob < 0.97 else ""
+            out.append(f"`{_label(slot):4}` {p.name}: {p.median:.0f} ({p.floor:.0f}-{p.ceiling:.0f}){doubt}{tag}")
+
+    if FLEX in m.slots:
+        fixed = ids(best) - {p.id for p in best[FLEX]}
+        pool = [p for p in m.my_team if FLEX in p.eligible and p.id not in fixed
+                and not p.unavailable and not p.locked(now)]
+        def flex_win(q):
+            t = sim.total([q if x.id in {f.id for f in best[FLEX]} else x for x in flat(best)])
+            o = sim.total(starters(m.opponent))
+            return float((t > o).mean())
+        cands = sorted(((flex_win(q), q) for q in pool), key=lambda c: -c[0])[:3]
+        out += ["", "**FLEX call:** " + " > ".join(f"{q.name} {w:.0%}" for w, q in cands)]
+
+    if len(ranked) > 1 and ranked[0][0] - ranked[1][0] <= COINFLIP:
+        pair = describe_swap(ranked[0][1], ranked[1][1])
+        if pair and pair[0][1]:
+            a, b = pair[0]
+            out.append(f"**Closest call:** {a.name} over {b.name} "
+                       f"({ranked[0][0]:.1%} vs {ranked[1][0]:.1%} win)")
+
+    out += ["", "**Changes vs. ESPN:** " + ("none, your lineup is already the best"
+                                           if not changes else "")]
+    out += [f"• {c}" for c in changes]
+    if changes and keep:
+        out.append(f"(gain under {SWITCH_MARGIN:.1%}: too close to bother switching)")
+
+    news_lines = [f"• {p.name}: {p.news['verdict']} ({p.news['play_prob']:.0%}) - {p.news['reason']}"
+                  for p in m.my_team + m.opponent if p.news]
+    if news_lines:
+        out += ["", "**News checks**"] + news_lines
+    out_list = [f"{p.name} ({'bye' if p.on_bye else p.injury.lower()})" for p in m.my_team if p.unavailable]
+    if out_list:
+        out.append(f"**Not available:** {', '.join(out_list)}")
+    threats = sorted(starters(m.opponent), key=lambda p: -(p.points if p.game_progress >= 100 else p.median))[:3]
+    out.append("**Opponent's biggest threats:** " + ", ".join(
+        f"{p.name} ({p.points:.1f} final)" if p.game_progress >= 100 else f"{p.name} ({p.median:.0f})"
+        for p in threats))
+    return head + "\n" + "\n".join(out)
+
+
 # ---------- the agent ----------
 
 class Agent:
@@ -460,6 +521,7 @@ def main():
     ap.add_argument("--stop-at", help="override hard stop, e.g. '2026-10-25 10:00'")
     ap.add_argument("--budget", type=float, default=BUDGET_USD)
     ap.add_argument("--plan", action="store_true", help="print the recommended lineup once and exit")
+    ap.add_argument("--send", action="store_true", help="with --plan: also send the full report to Discord")
     a = ap.parse_args()
     if a.plan:
         m = get_matchup()
@@ -470,6 +532,11 @@ def main():
         if m.critical:
             print("\n!!! DATA INCOMPLETE - do not act on this lineup: " + "; ".join(m.critical) + "\n")
         print(lineup_report(sim, ranked, current_lineup(m.my_team), m.my_team, now, m.slots))
+        if a.send:
+            report = phone_report(sim, ranked, current_lineup(m.my_team), m, now)
+            if m.critical:
+                report = report.replace("\n", "\n⚠️ DATA INCOMPLETE: don't act on this yet\n", 1)
+            alerts.send_alert(report)
         return
     stop_at = datetime.fromisoformat(a.stop_at) if a.stop_at else None
     league = {}
