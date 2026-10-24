@@ -440,7 +440,12 @@ class Agent:
         self.log("stop", report)
         rows = [f"{_label(slot):5} {p.name}" for slot in _ordered(self.current or {})
                 for p in (self.current or {})[slot]]
-        title = "🔒 Lineup locked at kickoff" if why.startswith("kickoff") else f"🔒 Lockbox stopped ({why})"
+        if why.startswith("kickoff"):
+            title = "🔒 Lineup locked at kickoff"
+        elif why.startswith("stopped after"):
+            title = "📋 Lockbox check done: your recommended lineup"
+        else:
+            title = f"🔒 Lockbox stopped ({why})"
         self.send(f"{title}\n"
                   f"Win chance: **{self.current_win or 0:.1%}**\n```\n" + "\n".join(rows) + "\n```\n"
                   f"{s['switches']} switch(es) · {s['resisted']} resisted · {s['held_stale']} stale holds · "
