@@ -6,3 +6,4 @@ backtest_results.json
 demo_snapshot.pkl
 demo_log.jsonl
 .cache/
+agent_run.log
