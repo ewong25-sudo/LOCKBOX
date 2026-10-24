@@ -264,7 +264,8 @@ class Agent:
             self.budget_hit = True
             news.LLM_ENABLED = False
             self.log("budget", f"${spent:.4f} >= ${self.budget:.2f} cap: LLM off, news falls back to keyword rules")
-            self.alert(f"Lockbox hit its ${self.budget:.2f} LLM budget. Still running, without the LLM.")
+            self.alert(f"⚠️ Lockbox hit its ${self.budget:.2f} LLM budget\n"
+                       f"Still running. News checks now use keyword rules instead of the LLM.")
         return spent
 
     def get_fresh(self):
@@ -361,8 +362,15 @@ class Agent:
         self.switched_this_loop = True
         self.stats["switches"] += 1
         self.log("switch", f"{why}: {'; '.join(lines)} ({change})")
-        self.alert("Lockbox: make this swap in the ESPN app\n" + "\n".join(f"- {l}" for l in lines)
-                   + f"\n({change})")
+        forced = why.startswith("FORCED")
+        title = (f"🚨 {why[len('FORCED ('):-1]}: make this swap in ESPN" if forced
+                 else f"🔁 Better lineup found ({why} win chance): make this swap in ESPN")
+        steps = []
+        for line in lines:   # "Start X over Y: reason" -> bold action + reason underneath
+            action, _, reason = line.partition(": ")
+            steps.append(f"**{action}**" + (f"\n› {reason}" if reason else ""))
+        before, after = change.removeprefix("win ").split(" -> ")
+        self.alert(f"{title}\n" + "\n".join(steps) + f"\n\nWin chance: {before} → **{after}**")
 
     def maybe_escalate(self, sim, ranked):
         """If the best two lineups are a coin flip, send ONE alert with our lean."""
@@ -385,7 +393,10 @@ class Agent:
         text = (f"Coin flip: {i.name} or {o.name}? Leaning {i.name} {lean:.0%}/{1 - lean:.0%} "
                 f"(win {w1:.1%} vs {w2:.1%}). Swap in the ESPN app to override.")
         self.log("escalate", text)
-        self.alert(text)
+        self.alert(f"🤔 Coin flip: {i.name} or {o.name}?\n"
+                   f"Leaning **{i.name}**: outscores the other option in {lean:.0%} of simulations.\n"
+                   f"Win chance {w1:.1%} vs {w2:.1%}, too close to be sure.\n"
+                   f"Swap in the ESPN app if you disagree.")
 
     # -- main loop --
     def run(self):
@@ -403,8 +414,9 @@ class Agent:
             m = self.get_fresh()
             if m is None:
                 if self.failures >= MAX_FAILURES:
-                    self.alert(f"Lockbox is stuck: {self.failures} data failures in a row. "
-                               f"Stopping; check your lineup manually.")
+                    self.alert(f"🛑 Lockbox is stuck and stopping\n"
+                               f"{self.failures} data failures in a row, so it won't act on bad data. "
+                               f"Check your lineup manually.")
                     return self.finish("stuck on bad data")
             else:
                 deadline = self.kickoff_deadline(m)
@@ -426,7 +438,13 @@ class Agent:
                   f"Lineup: {lineup}. {s['switches']} switches, {s['resisted']} resisted, "
                   f"{s['held_stale']} stale holds, LLM spend ${news.spend():.4f}.")
         self.log("stop", report)
-        self.send(report)
+        rows = [f"{_label(slot):5} {p.name}" for slot in _ordered(self.current or {})
+                for p in (self.current or {})[slot]]
+        title = "🔒 Lineup locked at kickoff" if why.startswith("kickoff") else f"🔒 Lockbox stopped ({why})"
+        self.send(f"{title}\n"
+                  f"Win chance: **{self.current_win or 0:.1%}**\n```\n" + "\n".join(rows) + "\n```\n"
+                  f"{s['switches']} switch(es) · {s['resisted']} resisted · {s['held_stale']} stale holds · "
+                  f"LLM ${news.spend():.4f}")
         return report
 
 
