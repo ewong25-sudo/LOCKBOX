@@ -67,6 +67,7 @@ DISCORD_WEBHOOK_URL=...   # optional
 
 ```bash
 python3 agent.py --plan            # recommended lineup, slot by slot, with reasons and the FLEX decision
+python3 agent.py --plan --send     # ...and send the full week report to your phone (Discord)
 python3 agent.py --every 15        # run unsupervised until kickoff
 python3 backtest.py                # replay weeks 1-6
 python3 demo.py                    # live demo (--offline uses a saved snapshot, --fast skips pauses)
