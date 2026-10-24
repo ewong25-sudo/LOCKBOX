@@ -1,0 +1,9 @@
+espn_api
+nflreadpy
+anthropic
+python-dotenv
+requests
+numpy
+scipy
+polars
+certifi

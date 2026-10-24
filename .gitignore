@@ -1,0 +1,8 @@
+.env
+__pycache__/
+.DS_Store
+agent_log.jsonl
+backtest_results.json
+demo_snapshot.pkl
+demo_log.jsonl
+.cache/
