@@ -29,7 +29,7 @@ def _discord_payload(text):
     else:
         payload["allowed_mentions"] = {"parse": []}   # never ping @everyone by accident
     if body.strip():
-        color = next((c for emoji, c in COLORS.items() if title.startswith(emoji)), DEFAULT_COLOR)
+        color = next((c for emoji, c in COLORS.items() if emoji in title), DEFAULT_COLOR)
         payload["embeds"] = [{"description": body.strip()[:4096], "color": color,
                               "footer": {"text": "Lockbox · lineup agent"}}]
     return payload

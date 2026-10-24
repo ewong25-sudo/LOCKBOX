@@ -125,7 +125,17 @@ def main():
         if clock["t"] == KICKOFF:
             banner(KICKOFF, "KICKOFF: lineup locks, agent stops", GREEN)
 
-    send = (lambda text: print(f"{BOLD}[ALERT]{END} {alerts._plain(text)}")) if a.no_discord else alerts.send_alert
+    def label(text):
+        # demo alerts land in the same Discord channel as real ones: never let them be mistaken
+        title, _, body = text.partition("\n")
+        note = (f"🧪 Demo scenario: real week-7 data, staged events "
+                f"({OUT_PLAYER} is not actually ruled out).")
+        return f"🧪 DEMO · {title}\n{body}\n\n{note}" if body else f"🧪 DEMO · {title}\n{note}"
+
+    if a.no_discord:
+        send = lambda text: print(f"{BOLD}[ALERT]{END} {alerts._plain(label(text))}")
+    else:
+        send = lambda text: alerts.send_alert(label(text))
     print(f"{BOLD}LOCKBOX demo{END}: real data, demo clock (Eastern), simulated events are labeled SIMULATED.")
     Agent(fetch=fetch, send=send, clock=lambda: clock["t"], sleep=sleep,
           stop_at=KICKOFF, log_file="demo_log.jsonl").run()
