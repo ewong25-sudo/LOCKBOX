@@ -21,6 +21,13 @@ def _discord_payload(text):
     """First line = headline (what the phone notification shows), the rest = a colored card."""
     title, _, body = text.partition("\n")
     payload = {"content": f"**{title}**"[:2000], "username": "Lockbox"}
+    user_id = os.getenv("DISCORD_USER_ID", "").strip()
+    if user_id.isdigit():
+        # @mention the user: Discord notifies mentions even when channel notifications are quiet
+        payload["content"] = f"<@{user_id}> {payload['content']}"[:2000]
+        payload["allowed_mentions"] = {"users": [user_id]}
+    else:
+        payload["allowed_mentions"] = {"parse": []}   # never ping @everyone by accident
     if body.strip():
         color = next((c for emoji, c in COLORS.items() if title.startswith(emoji)), DEFAULT_COLOR)
         payload["embeds"] = [{"description": body.strip()[:4096], "color": color,
