@@ -1,9 +1,9 @@
 """3-minute live demo: real week-7 data, a demo clock, and three SIMULATED events.
 
-  11:00 AM  normal check: agent keeps your lineup (and the real coin-flip alert fires)
-  11:15 AM  SIMULATED: a practice report nudges a bench QB up a hair -> agent RESISTS the flip-flop
-  11:31 AM  SIMULATED: inactives are out, a starting RB is ruled OUT -> agent swaps + alerts
-   1:00 PM  kickoff: hard stop, final report
+   8:00 AM  normal check: agent keeps your lineup (and the real coin-flip alert fires)
+   8:15 AM  SIMULATED: a practice report nudges a bench QB up a hair -> agent RESISTS the flip-flop
+   8:31 AM  SIMULATED: inactives are out, a starting RB is ruled OUT -> agent swaps + alerts
+  10:00 AM  kickoff: hard stop, final report
 
 Usage:
   python3 demo.py              fetch live data (saves a snapshot for offline use)
@@ -25,11 +25,11 @@ from sim import Sim, current_lineup
 
 SNAPSHOT = "demo_snapshot.pkl"
 DAY = datetime(2026, 10, 25)          # Sunday of week 7
-PT_TO_ET = timedelta(hours=3)         # ESPN game times are Pacific; the demo clock runs Eastern
-SCHEDULE = [DAY.replace(hour=11), DAY.replace(hour=11, minute=15), DAY.replace(hour=11, minute=31)]
-KICKOFF = DAY.replace(hour=13)
-OUT_PLAYER = "Josh Jacobs"            # the starter "ruled inactive" at 11:31
-NUDGE_PLAYER = "Bryce Young"          # bench QB who gets a small, not-enough bump at 11:15
+PT_TO_ET = timedelta(hours=0)         # ESPN game times are Pacific, and so is the demo clock
+SCHEDULE = [DAY.replace(hour=8), DAY.replace(hour=8, minute=15), DAY.replace(hour=8, minute=31)]
+KICKOFF = DAY.replace(hour=10)   # Sunday early slate, Pacific
+OUT_PLAYER = "Josh Jacobs"            # the starter "ruled inactive" at 8:31 (inactives ~90 min before kickoff)
+NUDGE_PLAYER = "Bryce Young"          # bench QB who gets a small, not-enough bump at 8:15
 
 BOLD, RED, GREEN, YELLOW, DIM, END = "\033[1m", "\033[91m", "\033[92m", "\033[93m", "\033[2m", "\033[0m"
 
@@ -48,7 +48,7 @@ def load(offline):
         m = get_matchup()
         with open(SNAPSHOT, "wb") as f:
             pickle.dump(m, f)
-    for p in m.my_team + m.opponent:   # put kickoffs on the Eastern demo clock
+    for p in m.my_team + m.opponent:   # kickoffs on the demo clock (Pacific)
         if p.game_time:
             p.game_time = p.game_time + PT_TO_ET
     return m
@@ -136,7 +136,7 @@ def main():
         send = lambda text: print(f"{BOLD}[ALERT]{END} {alerts._plain(label(text))}")
     else:
         send = lambda text: alerts.send_alert(label(text))
-    print(f"{BOLD}LOCKBOX demo{END}: real data, demo clock (Eastern), simulated events are labeled SIMULATED.")
+    print(f"{BOLD}LOCKBOX demo{END}: real data, demo clock (Pacific), simulated events are labeled SIMULATED.")
     Agent(fetch=fetch, send=send, clock=lambda: clock["t"], sleep=sleep,
           stop_at=KICKOFF, log_file="demo_log.jsonl").run()
     print(f"\n{DIM}LLM spend this run: ${news.spend():.4f}{END}")
